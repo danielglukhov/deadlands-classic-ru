@@ -2,7 +2,7 @@
   "id": "deadlands-classic-ru",
   "title": "Deadlands Classic RU — Character Builder",
   "description": "Пошаговый мастер создания героев Deadlands Reloaded с картами, характеристиками, навыками и библиотекой предметов SWADE.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "authors": [
     {
       "name": "Community private build"
@@ -38,5 +38,5 @@
     }
   ],
   "manifest": "https://raw.githubusercontent.com/danielglukhov/deadlands-classic-ru/main/module.json",
-  "download": "https://github.com/danielglukhov/deadlands-classic-ru/releases/download/v0.3.0/deadlands-classic-ru-v0.3.0.zip"
+  "download": "https://github.com/danielglukhov/deadlands-classic-ru/releases/download/v0.4.0/deadlands-classic-ru-v0.4.0.zip"
 }

@@ -1,5 +1,5 @@
 const MOD = 'deadlands-classic-ru';
-const VERSION = '0.2.1';
+const VERSION = '0.3.0';
 const STEPS = ['Герой','Карты','Характеристики','Навыки','Черты и изъяны','Снаряжение','Итог'];
 const ATTRS = [['agi','Ловкость'],['sma','Смекалка'],['spi','Характер'],['str','Сила'],['vig','Выносливость']];
 const SKILLS = [['shooting','Стрельба','agi'],['fighting','Драка','agi'],['notice','Внимание','sma'],['intimidation','Запугивание','spi'],['survival','Выживание','sma'],['gambling','Азартные игры','sma'],['guts','Храбрость','spi'],['riding','Верховая езда','agi'],['persuasion','Убеждение','spi'],['stealth','Маскировка','agi'],['tracking','Выслеживание','sma']];
@@ -33,16 +33,84 @@ class Builder extends foundry.applications.api.ApplicationV2 {
   if(this.step===3)body=`<h2>Навыки</h2><p>Потрачено: <strong>${this.used()} / ${this.budget()}</strong>. Каждая ступень до связанной характеристики стоит 1 очко, выше — 2.</p><div class="dl-rows">${SKILLS.map(([k,n,a])=>{const attr=d.attrs[a];const value=d.skills[k]||0;const breakdown=this.skillBreakdown(k,value);const price=breakdown.map(x=>`d${x.die}: ${x.cost}`).join(' + ')||'Не изучен';return `<label>${n} <small>(${ATTRS.find(x=>x[0]===a)[1]} d${attr})</small>${sel('skill.'+k,[[0,'— нет —'],...DIE.slice(1).map(v=>[v,'d'+v])],value)}<span class="dl-breakdown">${price}</span><strong>Итого: ${this.skillCost(k,value)} оч.</strong></label>`;}).join('')}</div><p class="dl-note">Это тестовый список навыков, не полный каталог.</p>`;
  if(this.step===4||this.step===5){const type=this.step===4?'traits':'gear';const terms=this.step===4?['edge','hindrance']:['weapon','armor','gear','consumable','shield'];const items=this.catalog.filter(x=>terms.includes(x.type));const query=this.query||'';const filtered=items.filter(x=>x.name.toLowerCase().includes(query.toLowerCase()));body=`<h2>${this.step===4?'Черты и изъяны':'Снаряжение'}</h2><p>Выбирай элементы из установленных в Foundry справочников. Список зависит от доступных пакетов SWADE.</p><input data-search placeholder="Поиск по справочникам" value="${esc(query)}"/><div class="dl-catalog">${filtered.slice(0,120).map(x=>`<label class="dl-entry"><input type="checkbox" data-item="${esc(x.id)}" ${d.chosen.includes(x.id)?'checked':''}/><span>${esc(x.name)} <small>${esc(x.type)} · ${esc(x.pack)}</small></span></label>`).join('')||'<p>В доступных справочниках ничего не найдено. Можно продолжить без предметов.</p>'}</div><p class="dl-note">Проверка требований черт, лимитов изъянов, цен и веса ещё не автоматизирована. Не путай этот список с полным каталогом классического Deadlands.</p>`;}
  if(this.step===6)body=`<h2>Проверка героя</h2><dl class="dl-summary"><dt>Имя</dt><dd>${esc(d.name)}, ${esc(d.age)} лет</dd><dt>Архетип</dt><dd>${esc(d.archetype)}</dd><dt>Характеристики</dt><dd>${ATTRS.map(([k,n])=>`${n} d${d.attrs[k]}`).join(' · ')}</dd><dt>Навыки</dt><dd>${SKILLS.filter(([k])=>d.skills[k]).map(([k,n])=>`${n} d${d.skills[k]}`).join(' · ')||'Не выбраны'}</dd><dt>Пункты</dt><dd>${this.used()} / ${this.budget()}</dd><dt>Предметы</dt><dd>${d.chosen.length}</dd><dt>Кошмар</dt><dd>${esc(d.nightmare||'Не указан')}</dd></dl><button type="button" class="dl-primary" data-act="create">Создать персонажа в Foundry</button><p class="dl-note">Создаётся Actor типа character. Исходные карточные данные сохраняются в flags модуля. Классические правила не заменяют автоматизацию SWADE.</p>`;
- return `<section class="dl-builder"><header><div class="dl-eyebrow">DEADLANDS · CLASSIC RU · v0.2.1</div><h1>Создание героя</h1><nav>${STEPS.map((s,i)=>`<button type="button" data-act="step" data-step="${i}" class="${i===this.step?'active':''}">${i+1}. ${s}</button>`).join('')}</nav></header><main>${body}</main><footer><button type="button" data-act="prev" ${this.step===0?'disabled':''}>← Назад</button><span>Шаг ${this.step+1} из ${STEPS.length}</span><button type="button" data-act="next" ${this.step===6?'disabled':''}>Далее →</button></footer></section>`;}
+ return `<section class="dl-builder"><header><div class="dl-eyebrow">DEADLANDS · CLASSIC RU · v0.3.0</div><h1>Создание героя</h1><nav>${STEPS.map((s,i)=>`<button type="button" data-act="step" data-step="${i}" class="${i===this.step?'active':''}">${i+1}. ${s}</button>`).join('')}</nav></header><main>${body}</main><footer><button type="button" data-act="prev" ${this.step===0?'disabled':''}>← Назад</button><span>Шаг ${this.step+1} из ${STEPS.length}</span><button type="button" data-act="next" ${this.step===6?'disabled':''}>Далее →</button></footer></section>`;}
  wire(el){el.querySelectorAll('[data-act]').forEach(b=>b.addEventListener('click',async()=>{const a=b.dataset.act;if(a==='step'){this.step=Number(b.dataset.step);this.render();}if(a==='prev'){this.step=Math.max(0,this.step-1);this.render();}if(a==='next'){if(this.step===2&&this.data.cards.length&&Object.values(this.data.assigned).filter(Boolean).length!==6){ui.notifications.warn('Назначь все шесть карт.');return;}if(this.step===3&&this.used()>this.budget()){ui.notifications.warn('Превышен бюджет навыков.');return;}this.step=Math.min(6,this.step+1);this.render();}if(a==='deal'){this.data.cards=deck().slice(0,7);this.data.discard='';this.data.assigned={};this.data.attrs={agi:4,sma:4,spi:4,str:4,vig:4};this.render();}if(a==='discard'){this.data.discard=b.dataset.id;this.data.assigned={};this.data.attrs={agi:4,sma:4,spi:4,str:4,vig:4};this.render();}if(a==='create')await this.createActor();}));
  el.querySelectorAll('[data-field]').forEach(x=>x.addEventListener('change',()=>{const k=x.dataset.field,v=x.value;if(k.startsWith('assign.')){const name=k.slice(7);if(v&&Object.entries(this.data.assigned).some(([other,id])=>other!==name&&id===v)){ui.notifications.warn('Эта карта уже назначена');this.render();return;}if(v) this.data.assigned[name]=v; else delete this.data.assigned[name];if(name!=='skill'){const card=this.data.cards.find(c=>c.id===v);this.data.attrs[name]=card?rank(card.value):4;}this.render();}else if(k.startsWith('skill.')){this.data.skills[k.slice(6)]=Number(v);this.render();}else this.data[k]=['age','cash'].includes(k)?Number(v):v;}));
  el.querySelectorAll('[data-item]').forEach(x=>x.addEventListener('change',()=>{this.data.chosen=x.checked?[...new Set([...this.data.chosen,x.dataset.item])]:this.data.chosen.filter(i=>i!==x.dataset.item);}));const search=el.querySelector('[data-search]');if(search)search.addEventListener('change',()=>{this.query=search.value;this.render();});}
- async createActor(){if(!game.user.isGM){ui.notifications.error('Создание персонажа в этой версии доступно Маршалу.');return;}if(this.used()>this.budget()){ui.notifications.error('Превышен бюджет навыков.');return;}const d=this.data;try{const actor=await Actor.create({name:d.name||'Новый герой',type:'character',system:{attributes:Object.fromEntries(ATTRS.map(([k])=>[k,{die:{sides:d.attrs[k]}}]))},flags:{[MOD]:{version:VERSION,age:d.age,archetype:d.archetype,bio:d.bio,nightmare:d.nightmare,cards:d.cards,discard:d.discard,assigned:d.assigned,skills:d.skills,cash:d.cash}}});
- const docs=[];for(const id of d.chosen){try{const doc=await fromUuid('Compendium.'+id);if(doc)docs.push(doc.toObject());}catch(e){console.warn(MOD,'Unable to import',id,e);}}
- if(docs.length)await actor.createEmbeddedDocuments('Item',docs);
- // Skills: update existing skill items when possible; create missing skills using SWADE item schema.
- for(const [key,value] of Object.entries(d.skills)){if(!value)continue;const info=SKILLS.find(x=>x[0]===key);if(!info)continue;const existing=actor.items.find(i=>i.type==='skill'&&i.name.toLowerCase()===info[1].toLowerCase());if(existing){await existing.update({'system.die.sides':value});}else{const template=actor.items.find(i=>i.type==='skill') || game.items.find(i=>i.type==='skill');if(template){const source=template.toObject();delete source._id;source.name=info[1];source.system.attribute=info[2];source.system.die={...(source.system.die||{}),sides:value,modifier:0};await actor.createEmbeddedDocuments('Item',[source]);}else{console.warn(MOD,'No SWADE skill template available:',info[1]);ui.notifications.warn('Навык «'+info[1]+'» не импортирован: нет шаблона SWADE.');}}}
- ui.notifications.info(`Герой «${d.name}» создан. Открой его из списка актёров.`);this.close();}catch(e){console.error(MOD,e);ui.notifications.error('Не удалось создать персонажа: '+e.message);}}
+ async createActor(){
+  if(!game.user.isGM){ui.notifications.error('Создание персонажа доступно Маршалу.');return;}
+  if(this.used()>this.budget()){ui.notifications.error('Превышен бюджет навыков.');return;}
+  const d=this.data;
+  if(d.cards.length && (Object.values(d.assigned).filter(Boolean).length!==6 || !d.discard)){
+   ui.notifications.error('Сначала сбрось одну карту и назначь остальные шесть.');return;
+  }
+  const attributeNames={agi:'agility',sma:'smarts',spi:'spirit',str:'strength',vig:'vigor'};
+  let actor=null;
+  try{
+   // SWADE 5.2.6 initializes core skills and currency in CharacterData._preCreate.
+   // Apply our values after creation, so the system's defaults cannot overwrite them.
+   actor=await Actor.create({name:d.name||'Новый герой',type:'character',flags:{[MOD]:{
+    version:VERSION,age:d.age,archetype:d.archetype,bio:d.bio,nightmare:d.nightmare,
+    cards:d.cards,discard:d.discard,assigned:d.assigned,skills:d.skills,cash:d.cash
+   }}});
+   if(!actor)throw new Error('Actor.create не вернул персонажа');
+   const update={
+    'system.details.archetype':d.archetype||'',
+    'system.details.biography.value':d.bio||'',
+    'system.details.currency':Number.isFinite(Number(d.cash))?Number(d.cash):0
+   };
+   for(const [short,long] of Object.entries(attributeNames)){
+    update[`system.attributes.${long}.die.sides`]=d.attrs[short]||4;
+   }
+   await actor.update(update);
+
+   const imported=[];
+   for(const id of d.chosen){
+    try{
+     const doc=await fromUuid('Compendium.'+id);
+     if(doc && doc.documentName==='Item'){
+      const data=doc.toObject();delete data._id;imported.push(data);
+     }
+    }catch(e){console.warn(MOD,'Не удалось импортировать предмет',id,e);}
+   }
+   if(imported.length)await actor.createEmbeddedDocuments('Item',imported);
+
+   const itemUpdates=[];
+   const newSkills=[];
+   const seen=new Set();
+   for(const [key,value] of Object.entries(d.skills)){
+    if(!value)continue;
+    const info=SKILLS.find(s=>s[0]===key);
+    if(!info)continue;
+    const attribute=attributeNames[info[2]];
+    if(!attribute)throw new Error(`Неизвестная характеристика навыка ${key}: ${info[2]}`);
+    // Match SWADE core skills by stable swid rather than translated display name.
+    const existing=actor.items.find(i=>i.type==='skill' &&
+     (i.system.swid===key || i.name.toLocaleLowerCase('ru')===info[1].toLocaleLowerCase('ru')));
+    if(existing){
+     itemUpdates.push({_id:existing.id,'system.attribute':attribute,'system.die.sides':value});
+    }else if(!seen.has(key)){
+     // Fresh item data: never copy Athletics metadata, translations, icons or flags.
+     newSkills.push({name:info[1],type:'skill',
+      img:'systems/swade/assets/icons/skill.svg',
+      system:{attribute,die:{sides:value,modifier:0},isCoreSkill:false,swid:key}});
+     seen.add(key);
+    }
+   }
+   if(itemUpdates.length)await actor.updateEmbeddedDocuments('Item',itemUpdates);
+   if(newSkills.length)await actor.createEmbeddedDocuments('Item',newSkills);
+   const invalid=actor.items.filter(i=>i.type==='skill' && i.system.attribute &&
+    !Object.values(attributeNames).includes(i.system.attribute));
+   if(invalid.length)throw new Error('Некорректные атрибуты навыков: '+invalid.map(i=>i.name).join(', '));
+   ui.notifications.info(`Герой «${actor.name}» создан. Проверь его лист.`);
+   this.close();
+  }catch(e){
+   console.error(MOD,'Ошибка создания персонажа',e);
+   ui.notifications.error('Ошибка создания персонажа: '+e.message);
+   if(actor)ui.notifications.warn('Персонаж создан частично. Проверь его перед игрой: '+actor.name);
+  }
+ }
+
 }
 Hooks.once('ready',()=>{game.deadlandsClassicRU={open:()=>new Builder().render(true)};if(game.user.isGM){ui.notifications.info('Deadlands Classic RU готов: кнопка в Актёрах.');}});
 Hooks.on('renderActorDirectory',(app,html)=>{if(!game.user.isGM)return;const root=html instanceof HTMLElement?html:html?.[0];if(!root||root.querySelector('.dl-open'))return;const btn=document.createElement('button');btn.className='dl-open';btn.innerHTML='🤠 Создать героя Deadlands';btn.addEventListener('click',()=>new Builder().render(true));(root.querySelector('.directory-header .header-actions')||root.querySelector('.directory-header')||root).append(btn);});

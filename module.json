@@ -1,3 +1,43 @@
+
 {
- "id":"deadlands-classic-ru","title":"Deadlands Classic RU — Character Builder","description":"Пошаговый мастер создания героев Deadlands Reloaded с картами, характеристиками, навыками и библиотекой предметов SWADE.","version":"0.1.0","authors":[{"name":"Community private build"}],"compatibility":{"minimum":"13","verified":"13","maximum":"13"},"relationships":{"systems":[{"id":"swade","type":"system","compatibility":{"minimum":"5.2.6"}}]},"esmodules":["scripts/main.js"],"styles":["styles/builder.css"],"languages":[{"lang":"ru","name":"Русский","path":"lang/ru.json"}],"manifest":"manifest": "https://raw.githubusercontent.com/danielglukhov/deadlands-classic-ru/main/module.json","download":"download": "https://github.com/danielglukhov/deadlands-classic-ru/releases/download/v0.1.0/deadlands-classic-ru-v0.1.0.zip"
+  "id": "deadlands-classic-ru",
+  "title": "Deadlands Classic RU — Character Builder",
+  "description": "Пошаговый мастер создания героев Deadlands Reloaded с картами, характеристиками, навыками и библиотекой предметов SWADE.",
+  "version": "0.1.0",
+  "authors": [
+    {
+      "name": "Community private build"
+    }
+  ],
+  "compatibility": {
+    "minimum": "13",
+    "verified": "13",
+    "maximum": "13"
+  },
+  "relationships": {
+    "systems": [
+      {
+        "id": "swade",
+        "type": "system",
+        "compatibility": {
+          "minimum": "5.2.6"
+        }
+      }
+    ]
+  },
+  "esmodules": [
+    "scripts/main.js"
+  ],
+  "styles": [
+    "styles/builder.css"
+  ],
+  "languages": [
+    {
+      "lang": "ru",
+      "name": "Русский",
+      "path": "lang/ru.json"
+    }
+  ],
+  "manifest": "https://raw.githubusercontent.com/danielglukhov/deadlands-classic-ru/main/module.json",
+  "download": "https://github.com/danielglukhov/deadlands-classic-ru/releases/download/v0.1.0/deadlands-classic-ru-v0.1.0.zip"
 }

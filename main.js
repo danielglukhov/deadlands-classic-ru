@@ -1,5 +1,11 @@
 const MOD = 'deadlands-classic-ru';
-const VERSION = '0.5.0';
+const VERSION = '0.6.0';
+const LIBRARY_URL='modules/deadlands-classic-ru/data/library.json';
+let localLibrary=[];
+async function getLocalLibrary(){if(localLibrary.length)return localLibrary;const r=await fetch(LIBRARY_URL);if(!r.ok)throw new Error('Не загружен каталог Deadlands: '+r.status);localLibrary=await r.json();return localLibrary;}
+function localItem(x){const desc=`<p>${esc(x.description)}</p><p><em>${esc(x.source)}</em></p>`;return {name:x.name,type:x.type,img:`modules/${MOD}/assets/icons/${x.icon}.svg`,system:{description:desc,...(x.price===null?{}:{price:x.price,weight:x.weight})},flags:{[MOD]:{key:x.key,source:x.source,homebrew:true}}};}
+async function installLibrary(){if(!game.user.isGM)throw new Error('Требуются права Маршала');const definitions=await getLocalLibrary();const name='deadlands-ru-library';let pack=game.packs.get(`world.${name}`);if(!pack)pack=await CompendiumCollection.createCompendium({name,label:'Deadlands RU — Снаряжение и особенности (адаптация)',type:'Item',package:'world'});const index=await pack.getIndex({fields:['flags.deadlands-classic-ru.key']});const existing=new Set(index.map(x=>x.flags?.[MOD]?.key).filter(Boolean));const missing=definitions.filter(x=>!existing.has(x.key));if(missing.length)await Item.createDocuments(missing.map(localItem),{pack:pack.collection});ui.notifications.info(`Библиотека Deadlands RU: добавлено ${missing.length}, всего ${definitions.length}.`);return pack;}
+
 const STEPS = ['Герой','Карты','Характеристики','Навыки','Черты','Изъяны','Особенности','Снаряжение','Итог'];
 const ATTRS = [['agi','Ловкость'],['sma','Смекалка'],['spi','Характер'],['str','Сила'],['vig','Выносливость']];
 const SKILLS = [['shooting','Стрельба','agi'],['fighting','Драка','agi'],['notice','Внимание','sma'],['intimidation','Запугивание','spi'],['survival','Выживание','sma'],['gambling','Азартные игры','sma'],['guts','Храбрость','spi'],['riding','Верховая езда','agi'],['persuasion','Убеждение','spi'],['stealth','Маскировка','agi'],['tracking','Выслеживание','sma']];
@@ -11,7 +17,7 @@ const deck = () => {const d=[];for(const suit of ['♠','♥','♦','♣'])for(c
 const sel=(key,options,chosen,disabled=[])=>`<select data-field="${key}">${options.map(([v,t])=>`<option value="${esc(v)}" ${String(chosen)===String(v)?'selected':''} ${disabled.includes(String(v))&&String(chosen)!==String(v)?'disabled':''}>${esc(t)}</option>`).join('')}</select>`;
 class Builder extends foundry.applications.api.ApplicationV2 {
  static DEFAULT_OPTIONS={id:'deadlands-classic-builder',window:{title:'Deadlands Classic — создание героя',resizable:true},position:{width:920,height:760},actions:{}};
- constructor(options={}){super(options);this.step=0;this.data={name:'Билли Бой',age:42,archetype:'Бродяга',bio:'',appearance:'',goals:'',notes:'',nightmare:'',cards:[],discard:'',assigned:{},attrs:{agi:4,sma:4,spi:4,str:4,vig:4},skills:{},chosen:[],gear:[],cash:250};this.catalog=[];this.loading=false;this.catalogLoaded=false;this.catalogErrors=[];this.query='';this.showDetails=new Set();}
+ constructor(options={}){super(options);this.step=0;this.data={name:'Билли Бой',age:42,ancestry:'Человек',archetype:'Бродяга',bio:'',appearance:'',goals:'',notes:'',nightmare:'',cards:[],discard:'',assigned:{},attrs:{agi:4,sma:4,spi:4,str:4,vig:4},skills:{},chosen:[],gear:[],cash:250};this.catalog=[];this.loading=false;this.catalogLoaded=false;this.catalogErrors=[];this.query='';this.showDetails=new Set();}
  async _renderHTML(){return this.html();}
  _replaceHTML(result,content){
   const oldMain=content.querySelector('.dl-builder main');
@@ -52,34 +58,12 @@ class Builder extends foundry.applications.api.ApplicationV2 {
     items.push({id:i.uuid,name:i.name,type:i.type,source:'Предметы мира',price:i.system.price,weight:i.system.weight,
      requirements:i.system.requirements,description:i.system.description||'',severity:i.system.severity,major:i.system.major});
    }
-   // Minimal local gear entries: names only, not claimed to be verified book prices.
-   const builtin=[
-    ['Револьвер','weapon','icons/weapons/guns/gun-pistol-flintlock.webp'],
-    ['Винтовка','weapon','icons/weapons/guns/gun-rifle.webp'],
-    ['Дробовик','weapon','icons/weapons/guns/gun-shotgun.webp'],
-    ['Нож','weapon','icons/weapons/daggers/dagger-straight.webp'],
-    ['Патроны для револьвера','consumable','icons/weapons/ammunition/bullets-belt.webp'],
-    ['Патроны для винтовки','consumable','icons/weapons/ammunition/bullets-belt.webp'],
-    ['Патроны для дробовика','consumable','icons/weapons/ammunition/bullets-belt.webp'],
-    ['Шляпа','gear','icons/equipment/head/hat-cowboy.webp'],
-    ['Плащ','gear','icons/equipment/back/cloak-brown.webp'],
-    ['Сапоги','gear','icons/equipment/feet/boots-leather-brown.webp'],
-    ['Верёвка','gear','icons/sundries/survival/rope-coiled-brown.webp'],
-    ['Фляга','gear','icons/containers/kitchenware/goblet-wine.webp'],
-    ['Фонарь','gear','icons/sundries/lights/lantern-iron-yellow.webp'],
-    ['Спички','gear','icons/sundries/lights/torch-brown.webp'],
-    ['Одеяло','gear','icons/sundries/survival/bedroll-grey.webp'],
-    ['Седло','gear','icons/equipment/back/bag-leather-brown.webp'],
-    ['Аптечка','gear','icons/containers/bags/medical-bag.webp'],
-    ['Провизия','consumable','icons/consumables/food/bread-loaf.webp'],
-    ['Бинокль','gear','icons/tools/scribal/magnifying-glass.webp'],
-    ['Часы карманные','gear','icons/tools/navigation/watch-simple-gold.webp']
-   ];
-   for(const [name,type,img] of builtin){
-    if(!items.some(i=>i.name.toLocaleLowerCase('ru')===name.toLocaleLowerCase('ru')&&i.type===type))
-     items.push({id:'builtin:'+name,name,type,img,source:'Deadlands RU · черновые заготовки',price:null,weight:null,description:'Заготовка для ручного заполнения Маршалом. Цена, вес и игровые параметры не подтверждены.',builtin:true});
+   const own=await getLocalLibrary();
+   for(const x of own){
+    const img=`modules/${MOD}/assets/icons/${x.icon}.svg`;
+    items.push({id:'builtin:'+x.key,key:x.key,name:x.name,type:x.type,img,source:x.source,price:x.price,weight:x.weight,description:x.description,builtin:true,homebrew:true});
    }
-   this.catalog=items.sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+   this.catalog=items.filter(x=>!x.key || !items.some(y=>y!==x&&y.key===x.key&&y.id.startsWith('builtin:'))).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
    this.catalogLoaded=true;
   }finally{this.loading=false;this.render();}
  }
@@ -88,7 +72,7 @@ class Builder extends foundry.applications.api.ApplicationV2 {
  equipmentTotal(){return this.getChosen().filter(x=>['weapon','armor','gear','consumable','shield'].includes(x.type)).reduce((v,x)=>v+(this.itemPrice(x)||0),0);}
 
  html(){const d=this.data;let body='';const input=(k,v,placeholder='')=>`<input data-field="${k}" value="${esc(v)}" placeholder="${esc(placeholder)}"/>`;
- if(this.step===0)body=`<h2>Кто ты, странник?</h2><div class="dl-grid"><label>Имя${input('name',d.name)}</label><label>Возраст<input data-field="age" type="number" min="1" value="${d.age}"></label><label>Архетип${input('archetype',d.archetype)}</label><label>Стартовый капитал<input data-field="cash" type="number" value="${d.cash}"></label></div><label>Внешность<textarea data-field="appearance">${esc(d.appearance)}</textarea></label><label>Цели<textarea data-field="goals">${esc(d.goals)}</textarea></label><label>Заметки<textarea data-field="notes">${esc(d.notes)}</textarea></label><label>Биография<textarea data-field="bio">${esc(d.bio)}</textarea></label><label>Наихудший кошмар<textarea data-field="nightmare">${esc(d.nightmare)}</textarea></label><p class="dl-note">Классические «Мёртвые земли»: все герои — люди. Одна черта бесплатно за расу.</p>`;
+ if(this.step===0)body=`<h2>Кто ты, странник?</h2><div class="dl-grid"><label>Имя${input('name',d.name)}</label><label>Возраст<input data-field="age" type="number" min="1" value="${d.age}"></label><label>Архетип${input('archetype',d.archetype)}</label><label>Народ${input('ancestry',d.ancestry)}</label><label>Стартовый капитал<input data-field="cash" type="number" value="${d.cash}"></label></div><label>Внешность<textarea data-field="appearance">${esc(d.appearance)}</textarea></label><label>Цели<textarea data-field="goals">${esc(d.goals)}</textarea></label><label>Заметки<textarea data-field="notes">${esc(d.notes)}</textarea></label><label>Биография<textarea data-field="bio">${esc(d.bio)}</textarea></label><label>Наихудший кошмар<textarea data-field="nightmare">${esc(d.nightmare)}</textarea></label><p class="dl-note">Классические «Мёртвые земли»: все герои — люди. Одна черта бесплатно за расу.</p>`;
  if(this.step===1){body=`<h2>Охота за джокером</h2><p>Раздай семь карт, сбрось одну (нельзя сбрасывать двойку или джокера). Остальные шесть назначь пяти характеристикам и запасу навыков.</p><button type="button" data-act="deal">Перетасовать и раздать</button><div class="dl-cards">${d.cards.map(c=>`<button type="button" class="dl-card ${d.discard===c.id?'discard':''}" data-act="discard" data-id="${c.id}" ${['2','JOKER'].includes(c.value)?'disabled':''}><span>${c.suit}</span><b>${c.value==='JOKER'?'🃏':c.value}</b><small>${c.value==='JOKER'?'d12':'d'+rank(c.value)}</small></button>`).join('')}</div>${d.discard?'<p class="dl-ok">Сброс выбран. Перейди к характеристикам.</p>':''}`;}
   if(this.step===2){
     const available=d.cards.filter(c=>c.id!==d.discard);
@@ -108,9 +92,9 @@ class Builder extends foundry.applications.api.ApplicationV2 {
   const chosen=this.getChosen().filter(x=>terms.includes(x.type));
   const money=Number(d.cash)||0;
   body=`<h2>${this.step===4?'Черты':this.step===5?'Изъяны':this.step===6?'Особенности':'Стартовое снаряжение'}</h2>
-   <p>Каталог читает доступные справочники SWADE, дополнительные наборы и предметы мира. Источник каждого предмета указан отдельно.</p>
+   <p>Каталог объединяет доступные справочники SWADE и нашу авторскую библиотеку. Предметы библиотеки можно отдельно установить в Compendium мира.</p>
    <div class="dl-catalog-toolbar"><button type="button" data-act="reload-catalog">↻ Обновить справочники</button>
-   <span>${this.loading?'Загрузка…':`Найдено: ${items.length}`}</span></div>
+   <button type="button" data-act="install-library">📚 Создать библиотеку Deadlands RU</button><span>${this.loading?'Загрузка…':`Найдено: ${items.length}`}</span></div>
    ${!traits?`<p><strong>Капитал: $${money}</strong> · Известная стоимость выбранного: $${this.equipmentTotal()} · Остаток: $${money-this.equipmentTotal()}</p>`:''}
    <input data-search placeholder="Поиск по названию или источнику" value="${esc(this.query||'')}"/>
    <div class="dl-catalog">${filtered.slice(0,250).map(x=>{
@@ -118,17 +102,17 @@ class Builder extends foundry.applications.api.ApplicationV2 {
     const detail=traits?({edge:'Черта',hindrance:'Изъян',ability:'Особенность'}[x.type]||x.type):`${x.type}${price===null?' · цена не указана':' · $'+price}${x.weight==null?'':' · вес '+x.weight}`;
     const req=Array.isArray(x.requirements)&&x.requirements.length?' · требования в SWADE':'';
     const description=String(x.description||'').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim().slice(0,350);
-    return `<label class="dl-entry"><input type="checkbox" data-item="${esc(x.id)}" ${d.chosen.includes(x.id)?'checked':''}/><span><strong>${x.img?`<img class="dl-item-icon" src="${esc(x.img)}" alt=""/>`:''}${esc(x.name)}</strong><small>${esc(detail+req)} · ${esc(x.source)}</small>${description?`<small class="dl-entry-desc">${esc(description)}</small>`:''}${x.builtin?'<small class="dl-warning">⚠ Не оценено: требуется ручное заполнение характеристик</small>':''}</span></label>`;
+    return `<label class="dl-entry"><input type="checkbox" data-item="${esc(x.id)}" ${d.chosen.includes(x.id)?'checked':''}/><span><strong>${x.img?`<img class="dl-item-icon" src="${esc(x.img)}" alt=""/>`:''}${esc(x.name)}</strong><small>${esc(detail+req)} · ${esc(x.source)}</small>${description?`<small class="dl-entry-desc">${esc(description)}</small>`:''}${x.homebrew?'<small class="dl-warning">Авторская адаптация · параметры неофициальные</small>':''}</span></label>`;
    }).join('')||'<p>Ничего не найдено. Проверь, установлены ли доступные справочники, или добавь свои Item в мир.</p>'}</div>
    ${filtered.length>250?`<p>Показаны первые 250 из ${filtered.length}. Уточни поиск.</p>`:''}
    ${this.catalogErrors.length?`<p class="dl-note">Некоторые справочники не прочитаны: ${esc(this.catalogErrors.join(', '))}</p>`:''}
-   <p class="dl-note">${traits?'Проверяй требования, ранг и лимиты по используемой редакции правил.':'Заготовки Deadlands не имеют подтверждённых цен и параметров. Они добавляются как черновые предметы, не расходуют капитал; Маршал должен заполнить их перед игрой.'}</p>
+   <p class="dl-note">${traits?'Проверяй требования, ранг и лимиты по используемой редакции правил.':'Авторские цены и вес — игровые оценки, не официальные значения из книг. Проверяй с Маршалом.'}</p>
    <p>Выбрано: ${chosen.length}${!traits?' · Вещи переносятся в инвентарь персонажа':''}</p>`;
  }
 
  if(this.step===8)body=`<h2>Проверка героя</h2><dl class="dl-summary"><dt>Имя</dt><dd>${esc(d.name)}, ${esc(d.age)} лет</dd><dt>Архетип</dt><dd>${esc(d.archetype)}</dd><dt>Характеристики</dt><dd>${ATTRS.map(([k,n])=>`${n} d${d.attrs[k]}`).join(' · ')}</dd><dt>Навыки</dt><dd>${SKILLS.filter(([k])=>d.skills[k]).map(([k,n])=>`${n} d${d.skills[k]}`).join(' · ')||'Не выбраны'}</dd><dt>Пункты</dt><dd>${this.used()} / ${this.budget()}</dd><dt>Черты, изъяны и предметы</dt><dd>${d.chosen.length}</dd><dt>Стоимость снаряжения (известная)</dt><dd>$${this.equipmentTotal()}</dd><dt>Остаток</dt><dd>$${(Number(d.cash)||0)-this.equipmentTotal()}</dd><dt>Кошмар</dt><dd>${esc(d.nightmare||'Не указан')}</dd></dl><button type="button" class="dl-primary" data-act="create">Создать персонажа в Foundry</button><p class="dl-note">Создаётся Actor типа character. Исходные карточные данные сохраняются в flags модуля. Классические правила не заменяют автоматизацию SWADE.</p>`;
- return `<section class="dl-builder"><header><div class="dl-eyebrow">DEADLANDS · CLASSIC RU · v0.5.0</div><h1>Создание героя</h1><nav>${STEPS.map((s,i)=>`<button type="button" data-act="step" data-step="${i}" class="${i===this.step?'active':''}">${i+1}. ${s}</button>`).join('')}</nav></header><main>${body}</main><footer><button type="button" data-act="prev" ${this.step===0?'disabled':''}>← Назад</button><span>Шаг ${this.step+1} из ${STEPS.length}</span><button type="button" data-act="next" ${this.step===8?'disabled':''}>Далее →</button></footer></section>`;}
- wire(el){el.querySelectorAll('[data-act]').forEach(b=>b.addEventListener('click',async()=>{const a=b.dataset.act;if(a==='step'){this.step=Number(b.dataset.step);this.query='';this.render();if((this.step>=4&&this.step<=7)&&!this.catalogLoaded)await this.loadCatalog();}if(a==='prev'){this.step=Math.max(0,this.step-1);this.render();}if(a==='next'){if(this.step===2&&this.data.cards.length&&Object.values(this.data.assigned).filter(Boolean).length!==6){ui.notifications.warn('Назначь все шесть карт.');return;}if(this.step===3&&this.used()>this.budget()){ui.notifications.warn('Превышен бюджет навыков.');return;}this.step=Math.min(8,this.step+1);this.query='';this.render();if((this.step>=4&&this.step<=7)&&!this.catalogLoaded)await this.loadCatalog();}if(a==='deal'){this.data.cards=deck().slice(0,7);this.data.discard='';this.data.assigned={};this.data.attrs={agi:4,sma:4,spi:4,str:4,vig:4};this.render();}if(a==='discard'){this.data.discard=b.dataset.id;this.data.assigned={};this.data.attrs={agi:4,sma:4,spi:4,str:4,vig:4};this.render();}if(a==='reload-catalog')await this.loadCatalog();if(a==='create')await this.createActor();}));
+ return `<section class="dl-builder"><header><div class="dl-eyebrow">DEADLANDS · CLASSIC RU · v0.6.0</div><h1>Создание героя</h1><nav>${STEPS.map((s,i)=>`<button type="button" data-act="step" data-step="${i}" class="${i===this.step?'active':''}">${i+1}. ${s}</button>`).join('')}</nav></header><main>${body}</main><footer><button type="button" data-act="prev" ${this.step===0?'disabled':''}>← Назад</button><span>Шаг ${this.step+1} из ${STEPS.length}</span><button type="button" data-act="next" ${this.step===8?'disabled':''}>Далее →</button></footer></section>`;}
+ wire(el){el.querySelectorAll('[data-act]').forEach(b=>b.addEventListener('click',async()=>{const a=b.dataset.act;if(a==='step'){this.step=Number(b.dataset.step);this.query='';this.render();if((this.step>=4&&this.step<=7)&&!this.catalogLoaded)await this.loadCatalog();}if(a==='prev'){this.step=Math.max(0,this.step-1);this.render();}if(a==='next'){if(this.step===2&&this.data.cards.length&&Object.values(this.data.assigned).filter(Boolean).length!==6){ui.notifications.warn('Назначь все шесть карт.');return;}if(this.step===3&&this.used()>this.budget()){ui.notifications.warn('Превышен бюджет навыков.');return;}this.step=Math.min(8,this.step+1);this.query='';this.render();if((this.step>=4&&this.step<=7)&&!this.catalogLoaded)await this.loadCatalog();}if(a==='deal'){this.data.cards=deck().slice(0,7);this.data.discard='';this.data.assigned={};this.data.attrs={agi:4,sma:4,spi:4,str:4,vig:4};this.render();}if(a==='discard'){this.data.discard=b.dataset.id;this.data.assigned={};this.data.attrs={agi:4,sma:4,spi:4,str:4,vig:4};this.render();}if(a==='reload-catalog')await this.loadCatalog();if(a==='install-library'){try{await installLibrary();this.catalogLoaded=false;await this.loadCatalog();}catch(e){console.error(MOD,e);ui.notifications.error(e.message);}}if(a==='create')await this.createActor();}));
  el.querySelectorAll('[data-field]').forEach(x=>x.addEventListener('change',()=>{const k=x.dataset.field,v=x.value;if(k.startsWith('assign.')){const name=k.slice(7);if(v&&Object.entries(this.data.assigned).some(([other,id])=>other!==name&&id===v)){ui.notifications.warn('Эта карта уже назначена');this.render();return;}if(v) this.data.assigned[name]=v; else delete this.data.assigned[name];if(name!=='skill'){const card=this.data.cards.find(c=>c.id===v);this.data.attrs[name]=card?rank(card.value):4;}this.render();}else if(k.startsWith('skill.')){this.data.skills[k.slice(6)]=Number(v);this.render();}else this.data[k]=['age','cash'].includes(k)?Number(v):v;}));
  el.querySelectorAll('[data-item]').forEach(x=>x.addEventListener('change',()=>{this.data.chosen=x.checked?[...new Set([...this.data.chosen,x.dataset.item])]:this.data.chosen.filter(i=>i!==x.dataset.item);this.render();}));const search=el.querySelector('[data-search]');if(search)search.addEventListener('change',()=>{this.query=search.value;this.render();});}
  async createActor(){
@@ -145,7 +129,7 @@ class Builder extends foundry.applications.api.ApplicationV2 {
    // SWADE 5.2.6 initializes core skills and currency in CharacterData._preCreate.
    // Apply our values after creation, so the system's defaults cannot overwrite them.
    actor=await Actor.create({name:d.name||'Новый герой',type:'character',flags:{[MOD]:{
-    version:VERSION,age:d.age,archetype:d.archetype,bio:d.bio,appearance:d.appearance,goals:d.goals,notes:d.notes,nightmare:d.nightmare,
+    version:VERSION,age:d.age,ancestry:d.ancestry,archetype:d.archetype,bio:d.bio,appearance:d.appearance,goals:d.goals,notes:d.notes,nightmare:d.nightmare,
     cards:d.cards,discard:d.discard,assigned:d.assigned,skills:d.skills,cash:d.cash
    }}});
    if(!actor)throw new Error('Actor.create не вернул персонажа');
@@ -171,11 +155,11 @@ class Builder extends foundry.applications.api.ApplicationV2 {
      }
     }catch(e){console.warn(MOD,'Не удалось импортировать предмет',id,e);}
    }
-   // Local drafts are intentionally unpriced and contain no unverified combat values.
+   // Module-local original adaptations with clearly labelled estimated prices and weights.
    for(const id of d.chosen.filter(x=>x.startsWith('builtin:'))){
     const entry=this.catalog.find(x=>x.id===id);
     if(!entry)continue;
-    imported.push({name:entry.name,type:entry.type,img:entry.img||'icons/svg/item-bag.svg',system:{description:'Черновой предмет Deadlands RU. Маршалу необходимо уточнить цену, вес и свойства по книге.',price:0,weight:0},flags:{[MOD]:{draft:true,unverified:true}}});
+    const local=(await getLocalLibrary()).find(x=>x.key===entry.key);if(local)imported.push(localItem(local));
    }
    if(imported.length)await actor.createEmbeddedDocuments('Item',imported);
    if(imported.length!==d.chosen.length)ui.notifications.warn('Некоторые выбранные предметы не импортированы — проверь инвентарь и черты.');
@@ -217,5 +201,5 @@ class Builder extends foundry.applications.api.ApplicationV2 {
  }
 
 }
-Hooks.once('ready',()=>{game.deadlandsClassicRU={open:()=>new Builder().render(true)};if(game.user.isGM){ui.notifications.info('Deadlands Classic RU готов: кнопка в Актёрах.');}});
+Hooks.once('ready',()=>{game.deadlandsClassicRU={open:()=>new Builder().render(true),installLibrary};if(game.user.isGM){ui.notifications.info('Deadlands Classic RU готов: кнопка в Актёрах.');}});
 Hooks.on('renderActorDirectory',(app,html)=>{if(!game.user.isGM)return;const root=html instanceof HTMLElement?html:html?.[0];if(!root||root.querySelector('.dl-open'))return;const btn=document.createElement('button');btn.className='dl-open';btn.innerHTML='🤠 Создать героя Deadlands';btn.addEventListener('click',()=>new Builder().render(true));(root.querySelector('.directory-header .header-actions')||root.querySelector('.directory-header')||root).append(btn);});
